@@ -18,7 +18,7 @@ def load(image_path):
 
     ### YOUR CODE HERE
     # Use skimage io.imread
-    pass
+    out = io.imread(image_path)
     ### END YOUR CODE
 
     return out
@@ -38,7 +38,7 @@ def change_value(image):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    out = 0.5* image**2
     ### END YOUR CODE
 
     return out
@@ -51,12 +51,16 @@ def convert_to_grey_scale(image):
         image: numpy array of shape(image_height, image_width, 3)
 
     Returns:
+        gray = (int)(0.299 * r + 0.587 * g + 0.144 * b);
         out: numpy array of shape(image_height, image_width, 3)
+
     """
-    out = None
+    out =  None
 
     ### YOUR CODE HERE
-    pass
+    
+    r, g, b= image[:,:,0], image[:,:,1], image[:,:,2]
+    out = (0.229 * r + 0.587* g + 0.144 * b).astype('int')
     ### END YOUR CODE
 
     return out
@@ -72,10 +76,17 @@ def rgb_decomposition(image, channel):
         out: numpy array of shape(image_height, image_width, 3)
     """
 
-    out = None
+    out = np.zeros(image.shape)
 
     ### YOUR CODE HERE
-    pass
+    r, g, b= image[:,:,0], image[:,:,1], image[:,:,2]
+    
+    if(channel=='R'):
+        out[:,:,1], out[:,:,2]= g, b
+    if(channel=='G'):
+        out[:,:,0], out[:,:,2]= r, b
+    if(channel=='B'):
+        out[:,:,0], out[:,:,1]= r, g
     ### END YOUR CODE
 
     return out
@@ -95,7 +106,12 @@ def lab_decomposition(image, channel):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    if(channel=='L'):
+        out = lab[:,:,0]
+    if(channel=='A'):
+        out = lab[:,:,1]
+    if(channel=='B'):
+        out = lab[:,:, 2]
     ### END YOUR CODE
 
     return out
@@ -115,7 +131,12 @@ def hsv_decomposition(image, channel='H'):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    if(channel=='H'):
+        out = hsv[:,:,0]
+    if(channel=='S'):
+        out = hsv[:,:,1]
+    if(channel=='V'):
+        out = hsv[:,:, 2]
     ### END YOUR CODE
 
     return out
@@ -134,9 +155,14 @@ def mix_images(image1, image2, channel1, channel2):
         out: numpy array of shape(image_height, image_width, 3)
     """
 
-    out = None
+    out = np.zeros_like(image1)
     ### YOUR CODE HERE
-    pass
+    left = rgb_decomposition(image1, channel1)
+    right = rgb_decomposition(image2, channel2)
+    mid = out.shape[1]//2  #mid lignes
+    out[:,:mid,:] = left[:,:mid,:]
+    out[ :,mid:, :] = right[: , mid:, :]
+
     ### END YOUR CODE
 
     return out
