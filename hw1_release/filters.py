@@ -17,10 +17,17 @@ def conv_nested(image, kernel):
     """
     Hi, Wi = image.shape
     Hk, Wk = kernel.shape
+    padH, padW = Hk//2, Wk//2
+    image = zero_pad(image, padH, padW) 
+
     out = np.zeros((Hi, Wi))
 
     ### YOUR CODE HERE
-    pass
+    for i in range(Hi):
+        for j in range(Wi):
+            for i1 in range(Hk):
+                for j1 in range(Wk):
+                    out[i,j]+=kernel[i1, j1]*image[i+i1,j +j1]
     ### END YOUR CODE
 
     return out
@@ -44,17 +51,21 @@ def zero_pad(image, pad_height, pad_width):
     """
 
     H, W = image.shape
-    out = None
+    out = np.zeros((H+2*pad_height, W+2*pad_width))
 
     ### YOUR CODE HERE
-    pass
+    if(pad_width==0):
+        out[pad_height:-pad_height,:]=image
+    elif(pad_height==0):
+        out[:,pad_width:-pad_width]=image
+    else:
+        out[pad_height:-pad_height, pad_width:-pad_width]=image
     ### END YOUR CODE
     return out
 
 
 def conv_fast(image, kernel):
     """ An efficient implementation of convolution filter.
-
     This function uses element-wise multiplication and np.sum()
     to efficiently compute weighted sum of neighborhood at each
     pixel.
@@ -75,9 +86,18 @@ def conv_fast(image, kernel):
     Hk, Wk = kernel.shape
     out = np.zeros((Hi, Wi))
 
+    #flipping the kerne in x axis
+    kernel = np.flip(kernel,axis=0);
+    #flipping the kernel in the y axis
+    # kernel = np.flip(kernel,axis=1)
+
     ### YOUR CODE HERE
-    pass
+    padded= zero_pad(image, Hk//2, Wk//2)
+    for i in range(Hi):
+        for j in range(Wi):
+            out[i,j]=np.sum(padded[i:i+Hk,j:j +Wk]* kernel)
     ### END YOUR CODE
+
 
     return out
 
@@ -113,7 +133,7 @@ def cross_correlation(f, g):
         out: numpy array of shape (Hf, Wf)
     """
 
-    out = None
+    out =conv_fast(f, np.flip(g, axis=0)) 
     ### YOUR CODE HERE
     pass
     ### END YOUR CODE
@@ -135,7 +155,8 @@ def zero_mean_cross_correlation(f, g):
 
     out = None
     ### YOUR CODE HERE
-    pass
+    g= g- g.mean()
+    out = conv_fast(f, np.flip(g, axis=0))
     ### END YOUR CODE
 
     return out
@@ -153,10 +174,24 @@ def normalized_cross_correlation(f, g):
     Returns:
         out: numpy array of shape (Hf, Wf)
     """
-
-    out = None
+    Hi, Wi = f.shape
+    Hk, Wk =  g.shape
+    out = np.zeros((Hi,Wi))
     ### YOUR CODE HERE
-    pass
+    padded= zero_pad(f, Hk//2, Wk//2)
+    for i in range(Hi):
+        for j in range(Wi):
+            #taking the patch of the image
+            patch_image = padded[i:i+Hk, j:j + Wk]
+
+            #normalized patch of the template and the image
+            m_p, s_p = g.mean(), g.std()
+            m_i, s_i = patch_image.mean(), patch_image.std()
+            patch_image = (patch_image - m_i)/ s_i 
+            patch_kernel = (g - m_p) / s_p
+
+            #cross correlation
+            out[i,j]=np.sum(patch_image* patch_kernel)
     ### END YOUR CODE
 
     return out
