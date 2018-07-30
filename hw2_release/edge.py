@@ -26,8 +26,15 @@ def conv(image, kernel):
     pad_width = ((pad_width0,pad_width0),(pad_width1,pad_width1))
     padded = np.pad(image, pad_width, mode='edge')
 
+    #flipping the kernel
+    kernel = np.flipud(kernel)
+    kernel = np.fliplr(kernel)
+
     ### YOUR CODE HERE
-    pass
+    for i in range(Hi):
+        for j in range(Wi):
+            out[i,j]= np.sum(padded[i:i+Hk, j:j+Wk]*kernel)
+
     ### END YOUR CODE
 
     return out
@@ -50,9 +57,13 @@ def gaussian_kernel(size, sigma):
     """  
     
     kernel = np.zeros((size, size))
+    dists = np.arange(-(size//2), size//2+1)
+    kernelx = np.repeat(dists[np.newaxis,:],size, axis=0)
+    kernely = np.repeat(dists[:,np.newaxis], size, axis=1)
 
     ### YOUR CODE HERE
-    pass
+    kernel = 1/(2*np.pi*sigma**2) * np.exp((- kernelx**2 -
+        kernely**2)/2*sigma**2)
     ### END YOUR CODE
 
     return kernel
@@ -72,7 +83,9 @@ def partial_x(img):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    kernel = np.array([0.5, 0, -0.5])
+    kernel = kernel[np.newaxis,:]
+    out = conv(img, kernel)
     ### END YOUR CODE
 
     return out
@@ -92,7 +105,9 @@ def partial_y(img):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    kernel = np.array([0.5, 0, -0.5])
+    kernel = kernel[:,np.newaxis]
+    out = conv(img, kernel)
     ### END YOUR CODE
 
     return out
@@ -113,10 +128,33 @@ def gradient(img):
     theta = np.zeros(img.shape)
 
     ### YOUR CODE HERE
-    pass
+    Gx = partial_x(img)
+    Gy = partial_y(img)
+
+    G = np.sqrt(Gx**2 + Gy**2)
+    theta = np.degrees(np.arctan2( Gy, Gx))+180
     ### END YOUR CODE
 
     return G, theta
+
+def neibhors_in_direction(theta):
+    """
+    Gives the two neigbors in the in theta direction
+
+    """
+
+    #horizontal neigbhors
+    if((theta==0) or (theta ==180) ):
+        return (0,1),(0,-1)
+    
+    #vertical line
+    if((theta == 90) or (theta == 270)):
+        return (1,0), (-1,0)
+
+    if( (theta == 45) or (theta== 225)):
+        return (-1,1) , (1,-1)
+    
+    return (1,1), (-1,-1)
 
 
 def non_maximum_suppression(G, theta):
@@ -139,7 +177,21 @@ def non_maximum_suppression(G, theta):
     theta = np.floor((theta + 22.5) / 45) * 45
 
     ### BEGIN YOUR CODE
-    pass
+    for i in range(H):
+        for j in range(W):
+            #get neighbor indices
+            ind1,ind2 = neibhors_in_direction(theta[i,j])
+            i1,j1 = i+ind1[0], j + ind1[1]
+            i2,j2 = i + ind2[0], j + ind2[1]
+            if( i1<H and  i1>=0 and j1>=0 and j1<W and (G[i,j]< G[i1,j1])):
+                out[i,j] = 0
+            elif(i2< H and i2>=0 and j2<W and j2>=0 and G[i,j]< G[i2,j2]):
+                out[i,j] = 0
+            else:
+                out[i,j]=G[i,j]
+
+
+
     ### END YOUR CODE
 
     return out
@@ -164,7 +216,8 @@ def double_thresholding(img, high, low):
     weak_edges = np.zeros(img.shape)
 
     ### YOUR CODE HERE
-    pass
+    strong_edges=img>high
+    weak_edges= np.logical_and(img>low, img<high)
     ### END YOUR CODE
 
     return strong_edges, weak_edges
@@ -216,8 +269,27 @@ def link_edges(strong_edges, weak_edges):
     indices = np.stack(np.nonzero(strong_edges)).T
     edges = np.zeros((H, W))
 
+    
+
     ### YOUR CODE HERE
-    pass
+    #list of pixels to consider
+    front = list()
+    for x in range(H):
+        for y in range(W):
+            if(strong_edges[x,y]):
+                front.append([x,y])
+
+    #loop to consider the neightors
+    while(len(front)):
+        #getting the first element
+        x,y = front.pop(0)
+        edges[x,y] = 1
+
+        for nei in get_neighbors(x,y, H, W):
+            x1, y1 = nei[0], nei[1]
+            if(not edges[x1, y1] and weak_edges[x1, y1] and not
+                    strong_edges[x1,y1]):
+                front.append([x1, y1])
     ### END YOUR CODE
 
     return edges
@@ -235,10 +307,14 @@ def canny(img, kernel_size=5, sigma=1.4, high=20, low=15):
         edge: numpy array of shape(H, W)
     """
     ### YOUR CODE HERE
-    pass
+    denoised=conv(img,gaussian_kernel(kernel_size,sigma)) 
+    G,theta= gradient(denoised)
+    NMS = non_maximum_suppression(G, theta)
+    strong,weak = double_thresholding(NMS, high, low)
+    edges = link_edges(strong, weak)
     ### END YOUR CODE
 
-    return edge
+    return edges
 
 
 def hough_transform(img):
@@ -269,13 +345,23 @@ def hough_transform(img):
 
     # Initialize accumulator in the Hough space
     accumulator = np.zeros((2 * diag_len + 1, num_thetas), dtype=np.uint64)
+
     ys, xs = np.nonzero(img)
 
     # Transform each point (x, y) in image
     # Find rho corresponding to values in thetas
     # and increment the accumulator in the corresponding coordiate.
     ### YOUR CODE HERE
-    pass
+    #one point
+
+    for (x,y) in zip(xs, ys):
+        #compute the image for each theta
+        R = x*cos_t + y*sin_t
+
+        for (j,r) in enumerate(R):
+            i = np.argmin(np.fabs(rhos-r))
+            accumulator[i,j]+=1
+
     ### END YOUR CODE
 
     return accumulator, rhos, thetas
