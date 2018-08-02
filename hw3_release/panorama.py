@@ -34,7 +34,27 @@ def harris_corners(img, window_size=3, k=0.04):
     dy = filters.sobel_h(img)
 
     ### YOUR CODE HERE
-    pass
+    #convolving 
+    dxc = convolve(dx**2, window)
+    dyc = convolve(dy**2, window)
+    dxcc= convolve(dx*dy, window) 
+    #creating the main matrix
+    M= np.zeros((2*H, 2*W))
+    
+    #storing the main matrix
+    M[::2,::2] = dxc
+    M[1::2,1::2] = dyc
+    M[::2,1::2] = dxcc 
+    M[1::2,::2] = dxcc
+    
+    M= view_as_blocks(M, block_shape=(2,2))
+
+    for i in range(H):
+        for j in range(W):
+            mat = M[i,j]
+            lam,eigenVec =np.linalg.eig(mat)
+            response[i,j] = lam.prod()- k*(lam.sum()**2)
+
     ### END YOUR CODE
 
     return response
@@ -60,9 +80,12 @@ def simple_descriptor(patch):
     """
     feature = []
     ### YOUR CODE HERE
-    pass
+    std = patch.std()
+    std = std if(std) else 1  # correct the standard deviation
+    feature = (patch - patch.mean())/std
+    
     ### END YOUR CODE
-    return feature
+    return np.ravel(feature)
 
 
 def describe_keypoints(image, keypoints, desc_func, patch_size=16):
@@ -110,10 +133,19 @@ def match_descriptors(desc1, desc2, threshold=0.5):
     dists = cdist(desc1, desc2)
 
     ### YOUR CODE HERE
-    pass
+    for i in range(N):
+        #getting the indices for the smallest distance
+        m1,m2 = np.argsort(dists[i,:])[:2]
+
+        # computing the ratio
+        ratio = dists[i,m1]/dists[i,m2]
+
+        #adding the match
+        if(ratio<threshold):
+            matches.append((i,m1))
     ### END YOUR CODE
-    
-    return matches
+     
+    return np.array(matches)
 
 
 def fit_affine_matrix(p1, p2):
@@ -136,7 +168,7 @@ def fit_affine_matrix(p1, p2):
     p2 = pad(p2)
 
     ### YOUR CODE HERE
-    pass
+    H = np.linalg.lstsq(p2, p1)[0]
     ### END YOUR CODE
 
     # Sometimes numerical issues cause least-squares to produce the last
@@ -168,6 +200,7 @@ def ransac(keypoints1, keypoints2, matches, n_iters=200, threshold=20):
         keypoints 1
     """
     N = matches.shape[0]
+    choices = list(range(N))
     n_samples = int(N * 0.2)
 
     matched1 = pad(keypoints1[matches[:,0]])
@@ -178,7 +211,29 @@ def ransac(keypoints1, keypoints2, matches, n_iters=200, threshold=20):
 
     # RANSAC iteration start
     ### YOUR CODE HERE
-    pass
+    for i in range(n_iters):
+        # 1 select random set of matches
+        sample = np.random.choice(choices, n_samples, replace=False) 
+
+        # 2 fitting the the set of p1 to p2
+        p1 = matched1[sample,:]
+        p2 = matched2[sample,:]
+
+        #fitt the matrix
+        mat= np.linalg.lstsq(p2, p1)[0]
+
+        #compute the image of rest of the point
+        image_matched1= matched2.dot(mat)
+
+        # compute the number of inlinier
+        dists = np.linalg.norm(image_matched1-matched1,axis=1)
+
+        inliers= (dists < threshold)
+        if(inliers.sum()> n_inliers):
+            n_inliers = inliers.sum()
+            H= mat
+            max_inliers=inliers
+
     ### END YOUR CODE
     return H, matches[max_inliers]
 
@@ -223,7 +278,11 @@ def hog_descriptor(patch, pixels_per_cell=(8,8)):
 
     # Compute histogram per cell
     ### YOUR CODE HERE
-    pass
+    for i in range(rows):
+        for j in range(cols):
+            cells[i,j]=np.histogram(theta_cells[i,j],n_bins,weights=G_cells[i,j])[0]
+    block = cells.ravel()
+    block=(block-block.mean())/block.std()
     ### YOUR CODE HERE
     
     return block
