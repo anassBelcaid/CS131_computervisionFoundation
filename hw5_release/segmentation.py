@@ -1,6 +1,6 @@
 import numpy as np
 import random
-from scipy.spatial.distance import squareform, pdist
+from scipy.spatial.distance import squareform, pdist, cdist
 from skimage.util import img_as_float
 
 ### Clustering Methods
@@ -36,7 +36,19 @@ def kmeans(features, k, num_iters=100):
 
     for n in range(num_iters):
         ### YOUR CODE HERE
-        pass
+        #compute the closest center to each point
+        dists = cdist(features, centers)
+        new_assignments = np.argmin(dists,axis=1)
+
+        #break if assignments didn't change
+        if(np.alltrue(assignments == new_assignments)):
+                break
+        else:
+            assignments = new_assignments
+        #given clustering update center
+        for j in range(k):
+            centers[j] = np.mean(features[assignments==j,:],axis=0)
+
         ### END YOUR CODE
 
     return assignments
@@ -71,9 +83,22 @@ def kmeans_fast(features, k, num_iters=100):
     assignments = np.zeros(N)
 
     for n in range(num_iters):
-        ### YOUR CODE HERE
-        pass
+        ## YOUR CODE HERE
+        #compute the closest center to each point
+        dists = cdist(features, centers)
+        new_assignments = np.argmin(dists,axis=1)
+
+        #break if assignments didn't change
+        if(np.alltrue(assignments == new_assignments)):
+                break
+        else:
+            assignments = new_assignments
+        #given clustering update center
+        for j in range(k):
+            centers[j] = np.mean(features[assignments==j,:],axis=0)
+
         ### END YOUR CODE
+
 
     return assignments
 
@@ -89,7 +114,7 @@ def hierarchical_clustering(features, k):
         Compute the distance between all pairs of clusters
         Merge the pair of clusters that are closest to each other
 
-    We will use Euclidean distance to defeine distance between two clusters.
+    We will use Euclidean distance to define distance between two clusters.
 
     Recomputing the centroids of all clusters and the distances between all
     pairs of centroids at each step of the loop would be very slow. Thankfully
@@ -121,12 +146,44 @@ def hierarchical_clustering(features, k):
     assignments = np.arange(N)
     centers = np.copy(features)
     n_clusters = N
+    clusters_labels = np.arange(N)
 
     while n_clusters > k:
         ### YOUR CODE HERE
-        pass
-        ### END YOUR CODE
+        #compute the distance betweens the centers
+        dists= squareform(pdist(centers))
+        np.fill_diagonal(dists,np.inf)
 
+        #getting the indices of the closest centers
+        i,j = np.unravel_index(np.argmin(dists), dists.shape)
+
+        #merging the (i) and (j) cluster
+        #assume always i<j
+        if(j>i):
+            i,j = j,i
+
+
+        Ai, Aj = clusters_labels[i], clusters_labels[j] 
+        #assign all the cluster j to i
+        assignments[assignments==Aj] = Ai
+        #new center
+        center_merge = np.mean(features[assignments==Ai,:],axis=0)
+
+        #centers delete
+        centers[i,:]= center_merge
+        
+        centers=np.delete(centers,j,axis=0)
+        clusters_labels = np.delete(clusters_labels,j)
+
+        # deletingt the two center
+        n_clusters=centers.shape[0]
+        
+        
+        
+        ### END YOUR CODE
+    #correcting assigments to deel from one to k
+    for i in range(k):
+        assignments[assignments==clusters_labels[i]]=i
     return assignments
 
 
@@ -145,7 +202,7 @@ def color_features(img):
     features = np.zeros((H*W, C))
 
     ### YOUR CODE HERE
-    pass
+    features= img.reshape((H*W,C))
     ### END YOUR CODE
 
     return features
@@ -173,7 +230,15 @@ def color_position_features(img):
     features = np.zeros((H*W, C+2))
 
     ### YOUR CODE HERE
-    pass
+    pos_X,pos_Y = np.mgrid[0:H,0:W]
+    features=np.dstack((color, pos_X, pos_Y))
+
+    #normalizing the feature
+    for k in range(C+2):
+        mean,std = np.mean(features[:,:,k]), np.std(features[:,:,k])
+        features[:,:,k]= (features[:,:,k]-mean)/std 
+    features=features.reshape((H*W,C+2))
+
     ### END YOUR CODE
 
     return features
@@ -187,9 +252,26 @@ def my_features(img):
     Returns:
         features - array of (H * W, C)
     """
-    features = None
+    from skimage.filters import sobel_h, sobel_v
+    from skimage.color import rgb2gray
+    img= rgb2gray(img)
+    H, W = np.shape(img) 
+    features = np.zeros((H,W,3))
     ### YOUR CODE HERE
-    pass
+    X, Y =sobel_h(img), sobel_v(img)
+
+    features[:,:,0]= X
+    features[:,:,1]= Y
+    features[:,:,2]= X**2+ Y**2
+
+    for i in range(3):
+        mean, std = np.mean(features[:,:,i]), np.std(features[:,:,i])
+        features[:,:,i] = (features[:,:,i]-mean)/std
+
+
+        
+
+    features = features.reshape((H*W,3))
     ### END YOUR CODE
     return features
     
@@ -213,7 +295,11 @@ def compute_accuracy(mask_gt, mask):
 
     accuracy = None
     ### YOUR CODE HERE
-    pass
+    #true positive
+    TP = np.logical_and(mask_gt,mask)
+    TF = np.logical_and(np.logical_not(mask_gt), np.logical_not(mask))
+    
+    accuracy = (np.sum(TP)+ np.sum(TF))/np.prod(mask.shape)
     ### END YOUR CODE
 
     return accuracy
