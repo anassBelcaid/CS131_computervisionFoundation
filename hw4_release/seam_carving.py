@@ -1,5 +1,6 @@
 import numpy as np
 from skimage import color
+from skimage.filters import sobel_h, sobel_v
 
 
 def energy_function(image):
@@ -20,7 +21,14 @@ def energy_function(image):
     out = np.zeros((H, W))
 
     ### YOUR CODE HERE
-    pass
+    # convert the image to grayscale
+    image = color.rgb2gray(image)
+    
+    #computing the gradient
+    Gx, Gy = np.gradient(image)
+
+    #taking the L1 norme
+    out = np.abs(Gx) + np.abs(Gy)
     ### END YOUR CODE
 
     return out
@@ -62,7 +70,31 @@ def compute_cost(image, energy, axis=1):
     paths[0] = 0  # we don't care about the first row of paths
 
     ### YOUR CODE HERE
-    pass
+    for i in range(1,H):
+        #constructing the matrix of choice
+        mat  = np.zeros((3,W))
+        #defference with left
+        mat[0,1:], mat[0,0] = energy[i,1:]+cost[i-1,:-1], np.inf   
+
+        #vertical part
+        mat[1,:] = energy[i,:] + cost[i-1,:] 
+
+        #right part
+        mat[2,:-1],mat[2,W-1] = energy[i,:-1] + cost[i-1,1:], np.inf
+
+        #taking the minimum over each col
+        cost[i]= np.min(mat,axis=0)
+
+        #paths equals to 1
+        mask_right= np.zeros(W,dtype=np.bool)
+        mask_right[:-1]= cost[i,:-1]==cost[i-1,1:]+energy[i,:-1]
+        paths[i,mask_right]=1
+
+        #path equals to -1
+        mask_left = np.zeros(W,dtype=np.bool)
+        mask_left[1:] = cost[i,1:]==cost[i-1,:-1]+energy[i,1:]
+        paths[i,mask_left]=-1
+
     ### END YOUR CODE
 
     if axis == 0:
@@ -99,7 +131,8 @@ def backtrack_seam(paths, end):
     seam[H-1] = end
 
     ### YOUR CODE HERE
-    pass
+    for i in range(H-2,-1,-1):
+        seam[i]= seam[i+1]+ paths[i+1,seam[i+1]]
     ### END YOUR CODE
 
     # Check that seam only contains values in [0, W-1]
@@ -125,10 +158,20 @@ def remove_seam(image, seam):
     if len(image.shape) == 2:
         image = np.expand_dims(image, axis=2)
 
-    out = None
     H, W, C = image.shape
+    out = np.zeros((H,W-1,C))
     ### YOUR CODE HERE
-    pass
+
+    #loop over each line
+    for i in range(H):
+        #seam value (or cut value)
+        s= seam[i]
+        #copy the left part
+        out[i,:s,:] = image[i,:s,:]
+
+        #copy the right part
+        out[i,s:,:]= image[i,s+1:,:]
+
     ### END YOUR CODE
     out = np.squeeze(out)  # remove last dimension if C == 1
 
@@ -169,7 +212,21 @@ def reduce(image, size, axis=1, efunc=energy_function, cfunc=compute_cost):
     assert size > 0, "Size must be greater than zero"
 
     ### YOUR CODE HERE
-    pass
+    #removing the lines
+    while(out.shape[1]>size):
+        #computing the energy
+        energy = efunc(out)
+
+        #computing the cost
+        costs,paths = cfunc(out, energy)
+
+        #backtrack seams
+        end= np.argmin(costs[-1,:])
+        seam = backtrack_seam(paths,end)
+        
+        #remove the seam
+        out = remove_seam(out, seam)
+
     ### END YOUR CODE
 
     assert out.shape[1] == size, "Output doesn't have the right shape"
@@ -196,7 +253,15 @@ def duplicate_seam(image, seam):
     H, W, C = image.shape
     out = np.zeros((H, W + 1, C))
     ### YOUR CODE HERE
-    pass
+    for i in range(H):
+    #seam value (or cut value)
+        s= seam[i]
+        #copy the left part
+        out[i,:s+1,:] = image[i,:s+1,:]
+
+        out[i,s+1,:] = image[i,s,:]
+
+        out[i,s+2:,:] = image[i,s+1:,:]
     ### END YOUR CODE
 
     return out
@@ -234,7 +299,15 @@ def enlarge_naive(image, size, axis=1, efunc=energy_function, cfunc=compute_cost
     assert size > W, "size must be greather than %d" % W
 
     ### YOUR CODE HERE
-    pass
+
+    while(out.shape[1]<size):
+        energy =efunc(image) 
+        costs,paths = cfunc(image,energy)
+        end = np.argmin(costs[-1,:])
+        seam = backtrack_seam(paths,end)
+        out = duplicate_seam(out,seam) 
+
+
     ### END YOUR CODE
 
     if axis == 0:
@@ -352,7 +425,6 @@ def enlarge(image, size, axis=1, efunc=energy_function, cfunc=compute_cost):
     assert size <= 2 * W, "size must be smaller than %d" % (2 * W)
 
     ### YOUR CODE HERE
-    pass
     ### END YOUR CODE
 
     if axis == 0:
