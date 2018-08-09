@@ -21,7 +21,8 @@ def hog_feature(image, pixel_per_cell = 8):
         hogImage: an image representation of hog provided by skimage
     '''
     ### YOUR CODE HERE
-    pass
+    hogFeature, hogImage = feature.hog(image, pixels_per_cell =
+            (pixel_per_cell, pixel_per_cell), visualise= True)
     ### END YOUR CODE
     return (hogFeature, hogImage)
 
@@ -52,7 +53,25 @@ def sliding_window(image, base_score, stepSize, windowSize, pixel_per_cell=8):
     response_map = np.zeros((H//stepSize+1, W//stepSize+1))
     
     ### YOUR CODE HERE
-    pass
+
+    for i in range(0,H,stepSize):
+        for j in range(0,W,stepSize):
+            #computing the hog feature of the patch
+            hogFeature = feature.hog(pad_image[i:i+winH, j:j+winW],
+                    pixels_per_cell =(pixel_per_cell,pixel_per_cell))
+
+            #computing the score
+            score = np.dot(hogFeature, base_score) 
+
+            #storing the score in the matrix
+            response_map[i//stepSize, j//stepSize] = score
+
+            #checking of the score change
+            if(score>max_score):
+                max_score = score
+                maxr = i     # why this shift
+                maxc = j
+
     ### END YOUR CODE
     
     
@@ -81,7 +100,14 @@ def pyramid(image, scale=0.9, minSize=(200, 100)):
     images.append((current_scale, image))
     # keep looping over the pyramid
     ### YOUR CODE HERE
-    pass
+    H, W = image.shape
+    Hm, Wm = minSize[0], minSize[1]
+
+    while((H> Hm) and (W >Wm)):
+        current_scale *= scale
+        image_scaled = rescale(image, current_scale)
+        images.append((current_scale, image_scaled))
+        H, W = image_scaled.shape
     ### END YOUR CODE
     return images
 
@@ -107,8 +133,14 @@ def pyramid_score(image,base_score, shape, stepSize=20, scale = 0.9, pixel_per_c
     max_scale = 1.0
     max_response_map =np.zeros(image.shape)
     images = pyramid(image, scale)
+
     ### YOUR CODE HERE
-    pass
+    for (cur_scale, image) in images:
+        #compute the sliding window in the scaled image
+        score, row, col, response =sliding_window(image,base_score,stepSize,shape,pixel_per_cell)
+        if(score>max_score):
+            maxr, maxc, max_scale = row, col, cur_scale
+            max_response_map = response
     ### END YOUR CODE
     return max_score, maxr, maxc, max_scale, max_response_map
 
@@ -133,8 +165,13 @@ def compute_displacement(part_centers, face_shape):
         
     '''
     d = np.zeros((part_centers.shape[0],2))
+    H,W = face_shape
     ### YOUR CODE HERE
-    pass
+    #1 distance from the center
+    d = np.array([H//2, W//2]) - part_centers 
+    #2 computing the mean andn standard deviation
+    mu = np.mean(d,axis=0).astype('int')
+    sigma = np.std(d,axis=0)
     ### END YOUR CODE
     return mu, sigma
         
@@ -149,8 +186,14 @@ def shift_heatmap(heatmap, mu):
         Returns:
             new_heatmap: np array of (h,w)
     '''
+    new_heatmap= np.zeros_like(heatmap)
     ### YOUR CODE HERE
-    pass
+    #1 normalize the heatmap
+    heatmap /= heatmap.max()
+    print(np.max(heatmap))
+    dx, dy =mu
+    new_heatmap=np.roll(heatmap,dx,axis=0)
+    new_heatmap = np.roll(new_heatmap,dy,axis=1)
     ### END YOUR CODE
     return new_heatmap
     
@@ -169,8 +212,14 @@ def gaussian_heatmap(heatmap_face, heatmaps, sigmas):
     Return:
         new_image: an image np array of (h,w) after gaussian convoluted
     '''
+    heatmap=heatmap_face.copy()
+    
     ### YOUR CODE HERE
-    pass
+    for (hmap, sigma) in zip(heatmaps,sigmas):
+        filtered= gaussian(hmap,sigma=sigma)
+        heatmap+=filtered
+
+    r,c = np.unravel_index(np.argmax(heatmap),heatmap.shape) 
     ### END YOUR CODE
     return heatmap, r , c
             
