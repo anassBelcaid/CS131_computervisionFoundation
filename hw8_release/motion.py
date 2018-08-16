@@ -39,8 +39,18 @@ def lucas_kanade(img1, img2, keypoints, window_size=5):
         # locations can be computed using bilinear interpolation.
         y = int(round(y)); x = int(round(x))
 
+        # Create th local matrix 
+        dx = Ix[x-w:x+w+1,y-w:y+w+1].flatten()
+        dy = Iy[x-w:x+w+1,y-w:y+w+1].flatten()
+        it = It[x-w:x+w+1,y-w:y+w+1].flatten()
+
+        # main marix displacement
+        A = np.stack((dx,dy))
+        
+        # solve the linear system 
+        U = np.linalg.lstsq(A.dot(A.T),-A.dot(it),rcond=-1)
         ### YOUR CODE HERE
-        pass
+        flow_vectors.append(U[0])
         ### END YOUR CODE
 
     flow_vectors = np.array(flow_vectors)
@@ -86,7 +96,9 @@ def iterative_lucas_kanade(img1, img2, keypoints,
 
         # TODO: Compute inverse of G at point (x1, y1)
         ### YOUR CODE HERE
-        pass
+        dx = Ix[x1-w:x1+w+1,y1-w:y1+w+1].flatten()
+        dy = Iy[x1-w:x1+w+1,y1-w:y1+w+1].flatten()
+        G = np.stack((dx,dy))
         ### END YOUR CODE
 
         # iteratively update flow vector
@@ -97,7 +109,10 @@ def iterative_lucas_kanade(img1, img2, keypoints,
 
             # TODO: Compute bk and vk = inv(G) x bk
             ### YOUR CODE HERE
-            pass
+
+            It= (img1[x2-w:x2+w+1,y2-w:y2+w+1]-img2[x2-w:x2+w+1,y2-w:y2+w+1]).flatten()
+            vk = np.linalg.lstsq(G.dot(G.T),G.dot(It),rcond=-1)
+            vk = vk[0]
             ### END YOUR CODE
 
             # Update flow vector by vk
@@ -135,14 +150,27 @@ def pyramid_lucas_kanade(img1, img2, keypoints,
 
     # Initialize pyramidal guess
     g = np.zeros(keypoints.shape)
-
     for L in range(level, -1, -1):
-        ### YOUR CODE HERE
         pass
-        ### END YOUR CODE
 
     d = g + d
     return d
+
+def normalize(v):
+    """
+    Function to normalize a vector 
+    
+    Args:  
+      v : Array 
+    Output :
+      v : the same array normalized (V/||V||)
+    """
+
+    norm = np.linalg.norm(v)
+    if(np.abs(norm)<1E-6):
+        return v
+    else:
+        return v/norm
 
 def compute_error(patch1, patch2):
     """ Compute MSE between patch1 and patch2
@@ -159,7 +187,10 @@ def compute_error(patch1, patch2):
     assert patch1.shape == patch2.shape, 'Differnt patch shapes'
     error = 0
     ### YOUR CODE HERE
-    pass
+    patch1 = normalize(patch1)
+    patch2 = normalize(patch2)
+
+    error = np.mean((patch1-patch2)**2)
     ### END YOUR CODE
     return error
 
